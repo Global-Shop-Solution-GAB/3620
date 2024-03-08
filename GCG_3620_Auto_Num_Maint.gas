@@ -1,0 +1,246 @@
+Program.Sub.ScreenSU.Start
+gui.F_Maint..create
+gui.F_Maint..caption("Opportunity Maintenance")
+gui.F_Maint..size(3855,3525)
+gui.F_Maint..minx(0)
+gui.F_Maint..miny(0)
+gui.F_Maint..position(0,0)
+gui.F_Maint..event(unload,F_Maint_Unload)
+gui.F_Maint..alwaysontop(False)
+gui.F_Maint..fontname("Arial")
+gui.F_Maint..fontsize(7)
+gui.F_Maint..forecolor(0)
+gui.F_Maint..fontstyle(,,,,)
+gui.F_Maint..BackColor(-2147483633)
+gui.F_Maint..controlbox(True)
+gui.F_Maint..maxbutton(False)
+gui.F_Maint..minbutton(False)
+gui.F_Maint..mousepointer(1)
+gui.F_Maint..moveable(True)
+gui.F_Maint..sizeable(False)
+gui.F_Maint..ShowInTaskBar(True)
+gui.F_Maint..titlebar(True)
+gui.F_Maint.gsfgOpp.create(gsflexgrid)
+gui.F_Maint.gsfgOpp.FixedRows(0)
+gui.F_Maint.gsfgOpp.FixedCols(0)
+gui.F_Maint.gsfgOpp.visible(True)
+gui.F_Maint.gsfgOpp.size(3330,2235)
+gui.F_Maint.gsfgOpp.zorder(0)
+gui.F_Maint.gsfgOpp.position(200,200)
+gui.F_Maint.gsfgOpp.enabled(True)
+gui.F_Maint.cmdSave.create(button)
+gui.F_Maint.cmdSave.caption("Save")
+gui.F_Maint.cmdSave.visible(True)
+gui.F_Maint.cmdSave.size(855,375)
+gui.F_Maint.cmdSave.zorder(0)
+gui.F_Maint.cmdSave.position(200,2500)
+gui.F_Maint.cmdSave.enabled(True)
+gui.F_Maint.cmdSave.fontname("Arial")
+gui.F_Maint.cmdSave.fontsize(7)
+gui.F_Maint.cmdSave.event(click,cmdsave_click)
+gui.F_Maint.cmdSave.defaultvalue("")
+gui.F_Maint.cmdSave.controlgroup(0)
+
+
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.SetErrorHandler("Main_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+F.ODBC.Connection!con.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+F.Intrinsic.Control.CallSub(Buildstyle)
+F.Intrinsic.Control.CallSub(Updatetable)
+F.Intrinsic.Control.CallSub(Loadgrid)
+
+Gui.F_Maint..Show
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Main_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3620_Auto_Num_Maint.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(F_maint_unload)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.Main.End
+
+Program.Sub.F_Maint_Unload.Start
+F.Intrinsic.Control.SetErrorHandler("F_Maint_Unload_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+F.ODBC.Connection!con.Close
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("F_Maint_Unload_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3620_Auto_Num_Maint.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.F_Maint_Unload.End
+
+program.sub.cmdsave_click.start
+F.Intrinsic.Control.SetErrorHandler("cmdsave_click_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.iC.Declare(Long)
+V.Local.bAuto.Declare(Boolean)
+V.Local.iAuto.Declare(Long)
+V.Local.sOpp.Declare(String)
+V.Local.iRows.Declare(Long)
+V.Local.sSQL.Declare(String)
+
+V.Local.iRows.Set(V.Screen.F_Maint!gsfgOpp.Rows)
+F.Intrinsic.Math.Sub(V.Local.iRows,1,V.Local.iRows)
+
+'Updating Table
+F.Intrinsic.Control.For(V.Local.iC,1,V.Local.iRows,1)
+	Gui.F_Maint.gsfgOpp.GetTextMatrix(0,V.Local.iC,V.Local.bAuto)
+
+	'Table only takes 0 or 1s, changing to be able to update table
+	F.Intrinsic.Control.If(V.Local.bAuto,=,True)
+		V.Local.iAuto.Set(1)
+	F.Intrinsic.Control.Else
+		V.Local.iAuto.Set(0)
+	F.Intrinsic.Control.EndIf
+	
+	Gui.F_Maint.gsfgOpp.GetTextMatrix(1,V.Local.iC,V.Local.sOpp)
+	F.Intrinsic.String.Build("UPDATE GCG_3620_Opp_Maint  SET AUTO_NUM = '{0}' WHERE OPPORTUNITY = '{1}'",V.Local.iAuto,V.Local.sOpp,V.Local.sSQL)
+	F.ODBC.Connection!con.Execute(V.Local.sSQL)
+F.Intrinsic.Control.Next(V.Local.iC)
+
+'Rather than exit, let user know save was successful, then allow them to make any changes if they need to
+F.Intrinsic.UI.Msgbox("Opportunies Checked Will Now Be Set For Auto-Numbering")
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("cmdsave_click_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3620_Auto_Num_Maint.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(F_maint_unload)
+Function.Intrinsic.Control.EndIf
+
+program.sub.cmdsave_click.end
+
+Program.Sub.BuildStyle.Start
+F.Intrinsic.Control.SetErrorHandler("BuildStyle_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+Gui.F_Maint.gsfgOpp.Cols(2)
+Gui.F_Maint.gsfgOpp.Rows(1)
+Gui.F_Maint.gsfgOpp.Rows(2)
+Gui.F_Maint.gsfgOpp.FixedRows(1)
+
+Gui.F_Maint.gsfgOpp.SetColumnPercentages(".15:.85")
+
+'Column 0
+'Style 1
+Gui.F_Maint.gsfgOpp.BuildStyle(1,0,"Type","Locked",True)
+'Style 2
+Gui.F_Maint.gsfgOpp.BuildStyle(2,0,"Type","Checkbox","")
+Gui.F_Maint.gsfgOpp.BuildStyle(2,0,"Format","Alignment",4)
+
+'Column 1
+'Style 1
+Gui.F_Maint.gsfgOpp.TextMatrix(1,0,"Opportunity")
+Gui.F_Maint.gsfgOpp.BuildStyle(1,0,"Type","Locked",True)
+Gui.F_Maint.gsfgOpp.BuildStyle(1,0,"Format","Alignment",4)
+Gui.F_Maint.gsfgOpp.BuildStyle(1,0,"Fontstyle","Bold",True)
+'Style2
+Gui.F_Maint.gsfgOpp.BuildStyle(2,1,"Format","Alignment",2)
+Gui.F_Maint.gsfgOpp.BuildStyle(2,1,"Type","Locked",True)
+
+Gui.F_Maint.gsfgOpp.ApplyStyle(0,1)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("BuildStyle_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3620_Auto_Num_Maint.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(F_maint_unload)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.BuildStyle.End
+
+Program.Sub.LoadGrid.Start
+F.Intrinsic.Control.SetErrorHandler("LoadGrid_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.iRows.Declare(Long)
+
+F.ODBC.Connection!con.OpenLocalRecordsetRO("rst","SELECT *  FROM GCG_3620_Opp_Maint")
+
+'loading data into grid
+F.Intrinsic.Control.If(V.ODBC.con!rst.EOF,<>,True)
+	Gui.F_Maint.gsfgOpp.LoadRecordset("con!rst",2,False)
+	V.Local.iRows.Set(V.Screen.F_Maint!gsfgOpp.Rows)
+	F.Intrinsic.Math.Sub(V.Local.iRows,1,V.Local.iRows)
+	Gui.F_Maint.gsfgOpp.Rows(V.Local.iRows)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("LoadGrid_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3620_Auto_Num_Maint.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(F_maint_unload)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.LoadGrid.End
+
+Program.Sub.UpdateTable.Start
+F.Intrinsic.Control.SetErrorHandler("UpdateTable_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.sSQL.Declare(String)
+
+'Select any opportunities that aren't already in the custom table
+F.ODBC.Connection!con.OpenLocalRecordsetRO("rst","SELECT VALUE FROM CRM_OPP_TYPE WHERE VALUE NOT IN (SELECT OPPORTUNITY FROM GCG_3620_Opp_Maint)")
+
+F.Intrinsic.Control.DoUntil(V.ODBC.con!rst.EOF,=,True)
+	F.Intrinsic.String.Build("INSERT INTO GCG_3620_Opp_Maint (AUTO_NUM,OPPORTUNITY) Values (0,'{0}')",V.ODBC.con!rst.FieldValTrim!VALUE,V.Local.sSQL)
+	F.ODBC.Connection!con.Execute(V.Local.sSQL)
+	F.ODBC.con!rst.MoveNext
+F.Intrinsic.Control.Loop
+
+F.ODBC.con!rst.Close
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("UpdateTable_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3620_Auto_Num_Maint.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(F_maint_unload)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.UpdateTable.End
+
+Program.Sub.Comments.Start
+${$0$}$GCG_3620_Auto_Num_Maint$}$BCC$}$3/3/2016
+${$2$}$$}$$}$0$}$4$}$Custom Menu Item$}$3/3/2016 8:32:55 AM$}$CRM -> Administration -> Auto Number Type Maint
+${$3$}$0$}$$}$-1$}$-1$}$$}$1/1/1900$}$This custom project will allow the user to use the opportunity tab for Service Requests, Parts Requests, Repair Requests, and Service Outreach. These opportunity types will be automatically numbered when selecting them. The project will also allow the user to email users in order to notify them that the opportunity is created. This email will auto-populate with data pertinent to the opportunity being created. A layout of the Email will be attached to the call. 
+
+This project will also contain a maintenance program that will allow the user to select Types that will be auto-incremented.
+Program.Sub.Comments.End
+
