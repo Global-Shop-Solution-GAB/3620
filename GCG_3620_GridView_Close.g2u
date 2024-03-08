@@ -1,0 +1,106 @@
+Program.Sub.ScreenSU.Start
+Gui.F_Close..Create
+Gui.F_Close..Caption("Close Notes")
+Gui.F_Close..Size(13410,6555)
+Gui.F_Close..MinX(0)
+Gui.F_Close..MinY(0)
+Gui.F_Close..Position(0,0)
+Gui.F_Close..BackColor(-2147483633)
+Gui.F_Close..MaxButton(False)
+Gui.F_Close..MousePointer(0)
+Gui.F_Close..Sizeable(False)
+Gui.F_Close..Event(UnLoad,F_Close_UnLoad)
+Gui.F_Close.GsGcView.Create(GsGridControl)
+Gui.F_Close.GsGcView.Size(13080,5490)
+Gui.F_Close.GsGcView.Position(105,105)
+Gui.F_Close.cmdSave.Create(Button)
+Gui.F_Close.cmdSave.Size(855,375)
+Gui.F_Close.cmdSave.Position(105,5820)
+Gui.F_Close.cmdSave.Caption("Save")
+Gui.F_Close.cmdSave.Event(Click,cmdSave_Click)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.F_Close_UnLoad.Start
+f.ODBC.Connection!Con.Close
+f.Intrinsic.Control.End
+Program.Sub.F_Close_UnLoad.End
+
+Program.Sub.Main.Start
+f.Intrinsic.Control.Try
+f.ODBC.Connection!Con.OpenConnection(v.Ambient.PDSN,v.Ambient.PUser,v.Ambient.PPass)
+v.Local.bGroup.Declare(Boolean)
+'on GAB 10 CRM 42927 we open the notes bdf
+f.Intrinsic.Control.If(v.Caller.Hook,=,42927)
+	f.Intrinsic.Control.If(V.Passed.DATA-CRM-OppSel,<>,"")
+		'make sure the person is in group CLOSER
+		f.Global.Security.IsInGroup(v.Caller.User,"CLOSER",v.Local.bGroup)
+		f.Intrinsic.Control.If(v.Local.bGroup,=,True)
+			f.Intrinsic.Control.CallSub(LoadBDF)
+		f.Intrinsic.Control.Else
+			f.Intrinsic.Control.CallSub(F_Close_UnLoad)
+		f.Intrinsic.Control.EndIf
+	f.Intrinsic.Control.EndIf
+f.Intrinsic.Control.Else
+	f.Intrinsic.Control.CallSub(F_Close_UnLoad)
+f.Intrinsic.Control.EndIf
+
+f.Intrinsic.Control.Catch
+v.Local.sError.Declare(String)
+Function.Intrinsic.String.Concat("Project: GCG_3620_GridView_Close.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+F.Intrinsic.UI.Msgbox(V.Local.sError)
+f.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.cmdSave_Click.Start
+f.Intrinsic.Control.Try
+v.Local.iCount.Declare(Long)
+v.Local.sRet.Declare(String)
+'save button, we need to see if there are any closed rows.
+f.Data.DataView.Create("BDF","Close",22,"Close = 1","")
+f.Intrinsic.Control.For(v.Local.iCount,v.DataView.BDF!Close.RowCount--)
+	f.Intrinsic.String.Build("[Closed] {0}{1}",v.Ambient.NewLine,v.DataView.BDF!Close(v.Local.iCount).Notes!FieldVal,v.Local.sRet)
+	f.Data.DataView.SetValue("BDF","Close",v.Local.iCount,"Notes",v.Local.sRet)
+f.Intrinsic.Control.Next(v.Local.iCount)
+'save back to the DB.
+f.Data.DataTable.SaveToDB("BDF","Con","CRM_NOTES_COMBINED","NID",2,"NID@!@NID*!*NOTES@!@NOTES")
+f.Intrinsic.Control.CallSub(F_Close_UnLoad)
+
+f.Intrinsic.Control.Catch
+	v.Local.sError.Declare(String)
+	Function.Intrinsic.String.Concat("Project: GCG_3620_GridView_Close.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+f.Intrinsic.Control.EndTry
+Program.Sub.cmdSave_Click.End
+
+Program.Sub.LoadBDF.Start
+f.Intrinsic.Control.Try
+v.Local.sRet.Declare(String)
+
+F.Intrinsic.String.Build("SELECT CAST(0 AS BIT) AS Close, NID, RTRIM(NOTES) AS Notes FROM CRM_NOTES_COMBINED WHERE OID = '{0}' ORDER BY NOTE_DATETIME DESC",V.Passed.DATA-CRM-OppSel.Long,v.Local.sRet)
+f.Data.DataTable.CreateFromSQL("BDF","Con",V.Local.sRet,True)
+f.Intrinsic.Control.If(v.DataTable.BDF.RowCount,>,0)
+	f.Data.DataView.Create("BDF","BDFView",22)
+	Gui.F_Close.GsGcView.AddGridviewFromDataview("BDFGrid","BDF","BDFView")
+	Gui.F_Close.GsGcView.MainView("BDFGrid")
+	Gui.F_Close.GsGcView.SetColumnProperty("BDFGrid","Close","ReadOnly",False)
+	Gui.F_Close.GsGcView.SetColumnProperty("BDFGrid","Close","AllowEdit",True)
+	Gui.F_Close.GsGcView.SetColumnProperty("BDFGrid","NID","Visible",False)
+	Gui.F_Close.GsGcView.SetColumnProperty("BDFGrid","Close","MaxWidth",50)
+	Gui.F_Close.GsGcView.SetColumnProperty("BDFGrid","Close","HeaderHAlignment","Center")
+	Gui.F_Close..Show
+f.Intrinsic.Control.Else
+	'There are no rows so tell them to select a opportunity first
+	f.Intrinsic.UI.Msgbox("Please select an Opportunity first.","Attention")
+	f.Intrinsic.Control.CallSub(F_Close_UnLoad)
+f.Intrinsic.Control.EndIf
+
+f.Intrinsic.Control.Catch
+	v.Local.sError.Declare(String)
+	Function.Intrinsic.String.Concat("Project: GCG_3620_GridView_Close.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Control.CallSub(F_Close_UnLoad)
+f.Intrinsic.Control.EndTry
+Program.Sub.LoadBDF.End
