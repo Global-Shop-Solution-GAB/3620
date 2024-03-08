@@ -1,0 +1,403 @@
+Program.Sub.ScreenSU.Start
+Gui.F_Email..create
+Gui.F_Email..caption("Send Notification Email")
+Gui.F_Email..size(4350,7080)
+Gui.F_Email..minx(0)
+Gui.F_Email..miny(0)
+Gui.F_Email..position(0,0)
+Gui.F_Email..event(UnLoad,f_email_unload)
+Gui.F_Email..forecolor(0)
+Gui.F_Email..fontstyle(False,False,False,False)
+Gui.F_Email..BackColor(-2147483633)
+Gui.F_Email..maxbutton(False)
+Gui.F_Email..minbutton(False)
+Gui.F_Email..mousepointer(1)
+Gui.F_Email..sizeable(False)
+Gui.F_Email.lbl1.create(label,"Email Address",True,1140,255,1,195,240,True,0,Arial,8,-2147483633,0)
+Gui.F_Email.lbl1.defaultvalue("")
+Gui.F_Email.lbl2.create(label,"Description of Work Requested",True,2340,255,1,200,3050,True,0,Arial,8,-2147483633,0)
+Gui.F_Email.lbl2.defaultvalue("")
+Gui.F_Email.cmdAdd.create(button)
+Gui.F_Email.cmdAdd.caption("Add")
+Gui.F_Email.cmdAdd.size(855,375)
+Gui.F_Email.cmdAdd.position(195,780)
+Gui.F_Email.cmdAdd.event(Click,cmdadd_click)
+Gui.F_Email.cmdAdd.defaultvalue("")
+Gui.F_Email.cmdRemove.create(button)
+Gui.F_Email.cmdRemove.caption("Remove")
+Gui.F_Email.cmdRemove.size(855,375)
+Gui.F_Email.cmdRemove.position(1100,775)
+Gui.F_Email.cmdRemove.event(Click,cmdremove_click)
+Gui.F_Email.cmdRemove.defaultvalue("")
+Gui.F_Email.lvwEmailAddress.create(listview)
+Gui.F_Email.lvwEmailAddress.view(3)
+Gui.F_Email.lvwEmailAddress.addlistviewcolumn("Recipients",3700,0)
+Gui.F_Email.lvwEmailAddress.size(3795,1695)
+Gui.F_Email.lvwEmailAddress.position(200,1245)
+Gui.F_Email.mltDesc.create(textboxm)
+Gui.F_Email.mltDesc.size(3780,2100)
+Gui.F_Email.mltDesc.position(200,3295)
+Gui.F_Email.mltDesc.defaultvalue("")
+Gui.F_Email.lbl3.create(label,"Requested By:",True,1125,255,1,200,5465,True,0,Arial,8,-2147483633,0)
+Gui.F_Email.lbl3.defaultvalue("")
+Gui.F_Email.txtRequestBy.create(textbox,"",True,3765,300,0,190,5670,True,0,Arial,8,-2147483643,1)
+Gui.F_Email.txtRequestBy.defaultvalue("")
+Gui.F_Email.cmdSend.create(button)
+Gui.F_Email.cmdSend.caption("Send")
+Gui.F_Email.cmdSend.size(1185,345)
+Gui.F_Email.cmdSend.position(200,6010)
+Gui.F_Email.cmdSend.event(Click,cmdsend_click)
+Gui.F_Email.cmdSend.defaultvalue("")
+Gui.F_Email.cboEAddress.Create(ComboBox)
+Gui.F_Email.cboEAddress.Size(3825,330)
+Gui.F_Email.cboEAddress.Position(195,420)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+Variable.Global.ikey.Declare(Long,0)
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.SetErrorHandler("Main_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+F.ODBC.Connection!con.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+f.ODBC.Connection!Common.OpenConnection(v.Ambient.Ccon,v.Ambient.Cuser,v.Ambient.Cpass)
+
+
+
+F.Intrinsic.Control.If(V.Caller.Hook,=,42923)
+	F.Intrinsic.Control.If(V.Passed.DATA-CRM-OppSel,=,"")
+		F.Intrinsic.UI.Msgbox("You must select an OID in order to send an email.")
+		F.Intrinsic.Control.End
+
+	F.Intrinsic.Control.EndIf
+	'we need to populate the cbo list with email addresses
+	f.ODBC.Connection!Common.OpenLocalRecordsetRO("rstName","SELECT FIRST_NAME + ' ' + LAST_NAME AS NAME FROM USER_INFORMATION ORDER BY LAST_NAME ASC, FIRST_NAME ASC")
+	Gui.F_Email.cboEAddress.AddItem("")
+	F.Intrinsic.Control.DoUntil(v.ODBC.Common!rstName.EOF,=,True)
+		Gui.F_Email.cboEAddress.AddItem(v.ODBC.Common!rstName.FieldVal!NAME)
+		f.ODBC.Common!rstName.MoveNext
+	f.Intrinsic.Control.Loop
+	f.ODBC.Common!rstName.Close
+	Gui.F_Email..Show
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Main_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3620_Send_Email.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(F_email_unload)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.Main.End
+
+Program.Sub.cmdsend_click.Start
+F.Intrinsic.Control.SetErrorHandler("cmdsend_click_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.sContacts.Declare(String)
+V.Local.sSenderEmail.Declare(String)
+V.Local.sSenderName.Declare(String)
+V.Local.sEmailBody.Declare(String)
+V.Local.sEmailSubject.Declare(String)
+V.Local.sRecipientEmail.Declare(String)
+V.Local.sOppNum.Declare(String)
+V.Local.sOppType.Declare(String)
+V.Local.sOppStatus.Declare(String)
+V.Local.sMachIssue.Declare(String)
+V.Local.sMachModel.Declare(String)
+V.Local.sMachSNum.Declare(String)
+V.Local.sInstallDate.Declare(String)
+V.Local.sBomPart.Declare(String)
+V.Local.sWarrentyEnd.Declare(String)
+V.Local.sCustomerPart.Declare(String)
+V.Local.sNextActionDate.Declare(String)
+V.Local.sDescription.Declare(String)
+V.Local.sRequestedBy.Declare(String)
+V.Local.iRet.Declare(Long)
+V.Local.iC.Declare(Long)
+V.Local.iUser.Declare(Long)
+V.Local.sCustomer.Declare(String)
+V.Local.sCustomerName.Declare(String)
+
+V.Local.sContacts.Set(V.Screen.F_Email!lvwEmailAddress.ListViewContents)
+
+F.Intrinsic.Control.If(V.Local.sContacts.Trim,=,"")
+	F.Intrinsic.UI.Msgbox("You must add at least one contact to email.")
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.EndIf
+
+'String is double delimited, but we only have one column, so get rid of one of the delimiters
+F.Intrinsic.String.Replace(V.Local.sContacts,"$@$","",V.Local.sContacts)
+F.Intrinsic.String.Split(V.Local.sContacts,"*!*",V.Local.sContacts)
+'Remove the extra element in the array
+F.Intrinsic.Math.Sub(V.Local.sContacts.UBound,1,V.Local.iRet)
+V.Local.sContacts.RedimPreserve(0,V.Local.iRet)
+
+'Using the email for the name as well. Building recipient list
+F.Intrinsic.Control.For(V.Local.iC,0,V.Local.sContacts.UBound,1)
+	F.Intrinsic.Control.If(V.Local.sRecipientEmail,=,"")
+		F.Intrinsic.String.Build("{0}*!*{1}",V.Local.sContacts(V.Local.iC),V.Local.sContacts(V.Local.iC),V.Local.sRecipientEmail)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.String.Build("{0}@!@{1}*!*{2}",V.Local.sRecipientEmail,V.Local.sContacts(V.Local.iC),V.Local.sContacts(V.Local.iC),V.Local.sRecipientEmail)
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Next(V.Local.iC)
+
+'Get sender information
+F.Global.Security.GetFullName(V.Caller.User,V.Caller.CompanyCode,V.Local.sSenderName)
+F.Global.Security.GetUserEmail(V.Caller.User,V.Caller.CompanyCode,V.Local.sSenderEmail)
+F.Intrinsic.String.Build("{0}*!*{1}",V.Local.sSenderEmail,V.Local.sSenderName,V.Local.sSenderEmail)
+
+'Get User ID
+F.Global.Security.GetUserId(V.Caller.User,V.Caller.CompanyCode,V.Local.iUser)
+
+'set Customer ID
+V.Local.sCustomer.Set(V.Passed.DATA-CRM-CompID)
+'set Customer Name
+V.Local.sCustomerName.Set(V.Passed.DATA-CRM-CompName)
+'Set Opp Number
+V.Local.sOppNum.Set(V.Passed.CRM-txtODesc)
+'Set OppType
+V.Local.sOppType.Set(V.Passed.CRM-cboOType)
+'Set Opp  Status
+V.Local.sOppStatus.Set(V.Passed.CRM-cboOStatus)
+'Set Machine Issue
+V.Local.sMachIssue.Set(V.Passed.CRM-cboOppUF-0)
+'Set Machine Model
+V.Local.sMachModel.Set(V.Passed.CRM-cboOppUF-1)
+'Set Machine Serial Number
+V.Local.sMachSNum.Set(V.Passed.CRM-cboOppUF-8)
+'Set Installation Date
+V.Local.sInstallDate.Set(V.Passed.CRM-cboOppUF-9)
+'Set Bom Part #
+V.Local.sBomPart.Set(V.Passed.CRM-cboOppUF1-0)
+'Set Warranty End Date
+V.Local.sWarrentyEnd.Set(V.Passed.CRM-cboOppUF1-1)
+'Set Customer part
+V.Local.sCustomerPart.Set(V.Passed.CRM-cboOppUF1-2)
+'Set Next Action Date
+V.Local.sNextActionDate.Set(V.Passed.CRM-cboOppUF1-3)
+
+'Set Description
+V.Local.sDescription.Set(V.Screen.F_Email!mltDesc.Text)
+'Set Requested By
+V.local.sRequestedBy.Set(V.Screen.F_Email!txtRequestBy.Text)
+
+'Begin building Email
+V.Local.sEmailSubject.Set("***Action Required***")
+
+'Standard to each email body
+V.Local.sEmailBody.Set("The following information relates to an open issue in our system. Your assistance is requested to help us complete this effort. Please read the following information and when your task is complete, reply directly through the Global Shop CRM system.")
+
+F.Intrinsic.String.Build("{0}{1}{2}",V.Local.sEmailBody,V.Ambient.NewLine,V.Ambient.NewLine,V.Local.sEmailBody)
+F.Intrinsic.String.Build("{0}Date:{1}{2}{3}{4}{5}{6}",V.Local.sEmailBody,V.Ambient.Tab,V.Ambient.Tab,V.Ambient.Tab,V.Ambient.Tab,V.Ambient.Date,V.Ambient.NewLine,V.Local.sEmailBody)
+F.Intrinsic.String.Build("{0}Customer:{1}{2}{3}{4}{5}",V.Local.sEmailBody,V.Ambient.Tab,V.Ambient.Tab,V.Ambient.Tab,V.Local.sCustomer,V.Ambient.NewLine,V.Local.sEmailBody)
+F.Intrinsic.String.Build("{0}Customer Name:{1}{2}{3}{4}{5}",V.Local.sEmailBody,V.Ambient.Tab,V.Ambient.Tab,V.Ambient.Tab,V.Local.sCustomerName,V.Ambient.NewLine,V.Local.sEmailBody)
+F.Intrinsic.String.Build("{0}Opportunity number:{1}{2}{3}{4}",V.Local.sEmailBody,V.Ambient.Tab,V.Ambient.Tab,V.Local.sOppNum,V.Ambient.NewLine,V.Local.sEmailBody)
+F.Intrinsic.String.Build("{0}Opportunity type:{1}{2}{3}{4}",V.Local.sEmailBody,V.Ambient.Tab,V.Ambient.Tab,V.Local.sOppType,V.Ambient.NewLine,V.Local.sEmailBody)
+F.Intrinsic.String.Build("{0}Opportunity status:{1}{2}{3}{4}",V.Local.sEmailBody,V.Ambient.Tab,V.Ambient.Tab,V.Local.sOppStatus,V.Ambient.NewLine,V.Local.sEmailBody)
+F.Intrinsic.String.Build("{0}Machine issue:{1}{2}{3}{4}{5}",V.Local.sEmailBody,V.Ambient.Tab,V.Ambient.Tab,V.Ambient.Tab,V.Local.sMachIssue,V.Ambient.NewLine,V.Local.sEmailBody)
+F.Intrinsic.String.Build("{0}Machine model:{1}{2}{3}{4}",V.Local.sEmailBody,V.Ambient.Tab,V.Ambient.Tab,V.Local.sMachModel,V.Ambient.NewLine,V.Local.sEmailBody)
+F.Intrinsic.String.Build("{0}Machine serial number:{1}{2}{3}",V.Local.sEmailBody,V.Ambient.Tab,V.Local.sMachSNum,V.Ambient.NewLine,V.Local.sEmailBody)
+F.Intrinsic.String.Build("{0}Installation date:{1}{2}{3}{4}",V.Local.sEmailBody,V.Ambient.Tab,V.Ambient.Tab,V.Local.sInstallDate,V.Ambient.NewLine,V.Local.sEmailBody)
+F.Intrinsic.String.Build("{0}BOM part #:{1}{2}{3}{4}{5}",V.Local.sEmailBody,V.Ambient.Tab,V.Ambient.Tab,V.Ambient.Tab,V.Local.sBomPart,V.Ambient.NewLine,V.Local.sEmailBody)
+F.Intrinsic.String.Build("{0}Warranty end date:{1}{2}{3}{4}",V.Local.sEmailBody,V.Ambient.Tab,V.Ambient.Tab,V.Local.sWarrentyEnd,V.Ambient.NewLine,V.Local.sEmailBody)
+F.Intrinsic.String.Build("{0}customer part #:{1}{2}{3}{4}",V.Local.sEmailBody,V.Ambient.Tab,V.Ambient.Tab,V.Local.sCustomerPart,V.Ambient.NewLine,V.Local.sEmailBody)
+F.Intrinsic.String.Build("{0}Next action date:{1}{2}{3}{4}{5}{6}",V.Local.sEmailBody,V.Ambient.Tab,V.Ambient.Tab,V.Local.sNextActionDate,V.Ambient.NewLine,V.Ambient.NewLine,V.Ambient.NewLine,V.Local.sEmailBody)
+F.Intrinsic.String.Build("{0}Description of work requested:{1}{2}{3}{4}",V.Local.sEmailBody,V.Ambient.Tab,V.Local.sDescription,V.Ambient.NewLine,V.Ambient.NewLine,V.Local.sEmailBody)
+F.Intrinsic.String.Build("{0}Request by:{1}{2}{3}{4}",V.Local.sEmailBody,V.Ambient.Tab,V.Ambient.Tab,V.Ambient.Tab,V.Local.sRequestedBy,V.Local.sEmailBody)
+
+'Create email to be sent by courier
+F.Global.Messaging.QueueMessage(V.Caller.CompanyCode,V.Local.iUser,"Opportunity Notification",V.Local.sEmailSubject,V.Local.sSenderEmail,V.Local.sRecipientEmail,V.Local.sEmailBody)
+
+v.Local.sContacts.RedimPreserve(0,0)
+V.Local.sContacts.Set(V.Screen.F_Email!lvwEmailAddress.ListViewContents)
+F.Intrinsic.String.Replace(V.Local.sContacts,"*!*","",V.Local.sContacts)
+f.Intrinsic.String.Replace(v.Local.sContacts,"$@$",",",v.Local.sContacts)
+
+
+F.Intrinsic.Control.CallSub(Createnote,"Body",V.Local.sEmailBody,"Contacts",v.Local.sContacts)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("cmdsend_click_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3620_Send_Email.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(F_email_unload)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.cmdsend_click.End
+
+Program.Sub.cmdremove_click.Start
+F.Intrinsic.Control.SetErrorHandler("cmdremove_click_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.iKey.Declare(Long)
+
+V.Local.iKey.Set(V.Screen.F_Email!lvwEmailAddress.SelectedItemKey)
+Gui.F_Email.lvwEmailAddress.RemoveItem(V.Local.iKey)
+'Gui.F_Email.txtEAddress.SetFocus
+Gui.F_Email.cboEAddress.SetFocus
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("cmdremove_click_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3620_Send_Email.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(F_email_unload)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.cmdremove_click.End
+
+Program.Sub.cmdadd_click.Start
+F.Intrinsic.Control.SetErrorHandler("cmdadd_click_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+v.Local.sSQL.Declare(String)
+v.Local.bEmail.Declare(Boolean)
+
+
+'F.Intrinsic.Control.If(V.Screen.F_Email!txtEAddress.Text,=,"")
+f.Intrinsic.Control.If(v.Screen.F_Email!cboEAddress.Text,=,"")
+	F.Intrinsic.UI.Msgbox("Please enter an email address.")
+F.Intrinsic.Control.Else
+	F.Intrinsic.Math.Add(V.Global.ikey,1,V.Global.ikey)
+'	Gui.F_Email.lvwEmailAddress.AddListItem(V.Global.ikey,V.Screen.F_Email!txtEAddress.Text)
+	'Gui.F_Email.lvwEmailAddress.AddListItem(v.Global.ikey,v.Screen.F_Email!cboEAddress.Text)
+	'We need to get the name and get the email from the table for the name
+	f.Intrinsic.String.Build("SELECT EMAIL FROM USER_INFORMATION WHERE UCASE(FIRST_NAME + ' ' + LAST_NAME) = '{0}' ",v.Screen.F_Email!cboEAddress.Text.UCase,v.Local.sSQL)
+	f.ODBC.Connection!Common.OpenLocalRecordsetRO("rstEmail",v.Local.sSQL)
+	f.Intrinsic.Control.If(v.ODBC.Common!rstEmail.EOF,=,False)
+		f.Intrinsic.Control.If(v.ODBC.Common!rstEmail.FieldValTrim!EMAIL,<>,"")
+			Gui.F_Email.lvwEmailAddress.AddListItem(v.Global.ikey,v.ODBC.Common!rstEmail.FieldValTrim!EMAIL)
+		f.Intrinsic.Control.EndIf
+	f.Intrinsic.Control.Else
+		f.Intrinsic.String.IsInString(v.Screen.F_Email!cboEAddress.Text,"@",True,v.Local.bEmail)
+		f.Intrinsic.Control.If(v.Local.bEmail,=,True)
+			Gui.F_Email.lvwEmailAddress.AddListItem(v.Global.ikey,v.Screen.F_Email!cboEAddress.Text)
+		f.Intrinsic.Control.EndIf
+	f.Intrinsic.Control.EndIf
+	f.ODBC.Common!rstEmail.Close
+'	Gui.F_Email.txtEAddress.Text("")
+	Gui.F_Email.cboEAddress.Text("")
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("cmdadd_click_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3620_Send_Email.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(F_email_unload)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.cmdadd_click.End
+
+Program.Sub.f_email_unload.Start
+F.Intrinsic.Control.SetErrorHandler("f_email_unload_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+F.ODBC.Connection!con.Close
+f.ODBC.Connection!Common.Close
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("f_email_unload_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3620_Send_Email.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.f_email_unload.End
+
+Program.Sub.CreateNote.Start
+F.Intrinsic.Control.SetErrorHandler("CreateNote_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.sSQL.Declare(String)
+V.Local.dDate.Declare(Date)
+V.Local.sCompID.Declare(String)
+V.Local.sCompType.Declare(String)
+V.Local.sOppSel.Declare(String)
+V.Local.iNID.Declare(Long)
+v.Local.sBody.Declare(String)
+v.Local.sContacts.Declare(String)
+v.Local.iCount.Declare(Long)
+v.Local.sTemp.Declare(String)
+
+V.Local.dDate.Set(V.Ambient.Date)
+V.Local.sSQL.Set("SELECT TOP 1 NID FROM CRM_NOTES_COMBINED ORDER BY NID DESC")
+F.ODBC.Connection!con.ExecuteAndReturn(V.Local.sSQL,V.Local.iNID)
+
+F.Intrinsic.Math.Add(V.Local.iNID,1,V.Local.iNID)
+V.Local.sCompID.Set(V.Passed.DATA-CRM-CompID)
+V.Local.sCompType.Set(V.Passed.DATA-CRM-CompType)
+V.Local.sOppSel.Set(V.Passed.DATA-CRM-OppSel)
+
+'Create new Note in Opp Notes
+F.ODBC.Connection!con.OpenLocalRecordsetRW("rstNote","SELECT * FROM CRM_NOTES_COMBINED")
+F.ODBC.con!rstNote.AddNew
+F.ODBC.con!rstNote.Set!NID(V.Local.iNID)
+F.ODBC.con!rstNote.Set!NTYPE(2)
+F.ODBC.con!rstNote.Set!COMPID(V.Local.sCompID)
+F.ODBC.con!rstNote.Set!COMPTYPE(V.Local.sCompType)
+F.ODBC.con!rstNote.Set!CID(0)
+F.ODBC.con!rstNote.Set!OID(V.Local.sOppSel)
+F.ODBC.con!rstNote.Set!NOTE_DATETIME(V.Local.dDate.PervasiveDate)
+f.Intrinsic.String.Build("{0}{1}Recipients:{2}",v.Args.Body,v.Ambient.NewLine,v.Ambient.Tab,v.Local.sBody)
+f.Intrinsic.String.Split(v.Args.Contacts,",",v.Local.sContacts)
+f.Intrinsic.Control.For(v.Local.iCount,0,v.Local.sContacts.UBound,1)
+	f.Global.Security.GetUserFromEmail(v.Local.sContacts(v.Local.iCount).Trim,v.Local.sTemp)
+	f.Global.Security.GetFullName(v.Local.sTemp,v.Local.sTemp)
+	f.Intrinsic.Control.If(v.Local.iCount,=,0)
+		f.Intrinsic.String.Build("{0}{1}",v.Local.sBody,v.Local.sTemp,v.Local.sBody)
+	f.Intrinsic.Control.Else
+		f.Intrinsic.String.Build("{0}, {1}",v.Local.sBody,v.Local.sTemp,v.Local.sBody)
+	f.Intrinsic.Control.EndIf
+f.Intrinsic.Control.Next(v.Local.iCount)
+'F.ODBC.con!rstNote.Set!NOTES(V.Args.Body)
+F.ODBC.con!rstNote.Set!NOTES(V.Local.sBody)
+F.ODBC.con!rstNote.Set!LAST_CHG_DATETIME(V.Local.dDate.PervasiveDate)
+F.ODBC.con!rstNote.Set!LAST_CHG_PGM("CRM")
+F.ODBC.con!rstNote.Set!LAST_CHG_BY(V.Caller.User)
+F.ODBC.con!rstNote.Update
+
+F.ODBC.con!rstNote.Close
+
+F.Intrinsic.UI.ChangeCallerProperty(V.Passed.CRM-txtODesc,"LOCK",1)
+
+F.Intrinsic.Control.CallSub(F_email_unload)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("CreateNote_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3620_Send_Email.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(F_email_unload)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.CreateNote.End
+
+Program.Sub.Comments.Start
+${$0$}$CRM Notification Email$}$BCC$}$2/18/2016$}$False
+${$1$}$$}$$}$0$}$42923$}$CRM.NET-TOOL-GAB1$}$3/3/2016 11:36:23 AM$}$(Program: Global_Shop_CRM.exe; Screen: )
+
+${$3$}$0$}$$}$0$}$-1$}$$}$12:00:00 AM$}$This custom project will allow the user to use the opportunity tab for Service Requests, Parts Requests, Repair Requests, and Service Outreach. These opportunity types will be automatically numbered when selecting them. The project will also allow the user to email users in order to notify them that the opportunity is created. This email will auto-populate with data pertinent to the opportunity being created. A layout of the Email will be attached to the call.
+
+This project will also contain a maintenance program that will allow the user to select Types that will be auto-incremented.
+Program.Sub.Comments.End
+
