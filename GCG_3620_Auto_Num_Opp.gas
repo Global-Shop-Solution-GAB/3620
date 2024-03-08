@@ -1,0 +1,189 @@
+Program.Sub.ScreenSU.Start
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.SetErrorHandler("Main_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+F.ODBC.Connection!con.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+
+'Opportunity change hook
+F.Intrinsic.Control.If(V.Caller.Hook,=,42974)
+	F.Intrinsic.Control.If(V.Passed.CRM-cboOType,<>,"")
+		F.Intrinsic.Control.CallSub(Checkopp)
+	F.Intrinsic.Control.EndIf
+'CRM Save
+F.Intrinsic.Control.ElseIf(V.Caller.Hook,=,42911)
+	F.Intrinsic.Control.CallSub(Updateautonum)
+'F.Intrinsic.Control.EndIf
+
+'CRM Company Populate Changing Bill To to Ship To
+f.Intrinsic.Control.ElseIf(v.Caller.Hook,=,42903)
+	f.Intrinsic.Control.CallSub(Ship_To)
+f.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Main_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3620_Auto_Num_Opp.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(Unload)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.Main.End
+
+Program.Sub.Unload.Start
+F.Intrinsic.Control.SetErrorHandler("Unload_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+F.ODBC.Connection!con.Close
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Unload_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3620_Auto_Num_Opp.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.Unload.End
+
+Program.Sub.CheckOpp.Start
+F.Intrinsic.Control.SetErrorHandler("CheckOpp_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.sOpp.Declare(String)
+V.Local.sSQL.Declare(String)
+V.Local.sOppText.Declare(String)
+
+'Check to see if the opportunity is to be auto numbered
+V.Local.sOpp.Set(V.Passed.CRM-cboOType)
+F.Intrinsic.String.Build("SELECT AUTO_NUM FROM GCG_3620_Opp_Maint WHERE OPPORTUNITY = '{0}'",V.Local.sOpp,V.Local.sSQL)
+F.ODBC.Connection!con.OpenLocalRecordsetRO("rst",V.Local.sSQL)
+
+'If the opportunity is supposed to be autonumbered, check to make sure a number isn't already there, if it is the screen is loading an existing Opportunity, and should only lock the description field, else it will update the description field and lock it.
+F.Intrinsic.Control.If(V.ODBC.con!rst.EOF,<>,True)
+	F.Intrinsic.Control.If(V.ODBC.con!rst.FieldValTrim!AUTO_NUM,=,True)
+		F.Intrinsic.Control.If(V.Passed.CRM-txtODesc.IsNumeric,<>,True)
+			F.ODBC.Connection!con.OpenLocalRecordsetRO("rstAuto","SELECT MAX(AUTO_NUMBER) AS AUTO_NUMBER FROM GCG_3620_AUTO_NUM_OP")
+			F.Intrinsic.Control.If(V.ODBC.con!rstAuto.FieldValTrim!AUTO_NUMBER,<>,"")
+				V.Passed.CRM-txtODesc.Set(V.ODBC.con!rstAuto.FieldValTrim!AUTO_NUMBER)
+			F.Intrinsic.Control.Else
+				V.Passed.CRM-txtODesc.Set("1")
+				F.ODBC.Connection!con.Execute("INSERT INTO GCG_3620_AUTO_NUM_OP VALUES('')")
+			F.Intrinsic.Control.EndIf
+			F.ODBC.con!rstAuto.Close
+		F.Intrinsic.Control.EndIf
+		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.CRM-txtODesc,"LOCK",1)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Control.If(V.Passed.CRM-txtODesc.IsNumeric,=,True)
+			V.Passed.CRM-txtODesc.Set("")
+		F.Intrinsic.Control.EndIf
+
+		F.Intrinsic.UI.ChangeCallerProperty(V.Passed.CRM-txtODesc,"LOCK",0)
+	F.Intrinsic.Control.EndIf
+'It it isn't auto numbered, then reset the description to blank if it's a number, and unlock the description field.
+F.Intrinsic.Control.Else
+	F.Intrinsic.Control.If(V.Passed.CRM-txtODesc.IsNumeric,=,True)
+		V.Passed.CRM-txtODesc.Set("")
+	F.Intrinsic.Control.EndIf
+
+	F.Intrinsic.UI.ChangeCallerProperty(V.Passed.CRM-txtODesc,"LOCK",0)
+F.Intrinsic.Control.EndIf
+
+F.ODBC.con!rst.Close
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("CheckOpp_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3620_Auto_Num_Opp.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(Unload)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.CheckOpp.End
+
+Program.Sub.UpdateAutoNum.Start
+F.Intrinsic.Control.SetErrorHandler("UpdateAutoNum_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.sOpp.Declare(String)
+V.Local.sSQL.Declare(String)
+V.Local.sOppNumber.Declare(String)
+
+V.Local.sOpp.Set(V.Passed.CRM-cboOType)
+V.Local.sOppNumber.Set(V.Passed.CRM-txtODesc)
+
+
+'Check to make sure that this type is autonumbered
+F.Intrinsic.String.Build("SELECT * FROM GCG_3620_Opp_Maint WHERE AUTO_NUM = 1 AND OPPORTUNITY = '{0}'",V.Local.sOpp,V.Local.sSQL)
+F.ODBC.Connection!con.OpenLocalRecordsetRO("rst",V.Local.sSQL)
+
+F.Intrinsic.Control.If(V.ODBC.con!rst.EOF,<>,True)
+	V.Local.sSQL.Set("SELECT TOP 1 AUTO_NUMBER FROM GCG_3620_AUTO_NUM_OP ORDER BY AUTO_NUMBER DESC")
+	F.ODBC.Connection!con.OpenLocalRecordsetRO("rstNum",V.Local.sSQL)
+	'If the Description is equal to the highest value in the table, update the table so that a new Opportunity will have the next value. Otherwise the save is for an existing opportunity
+	F.Intrinsic.Control.If(V.ODBC.con!rstNum.EOF,<>,True)
+		F.Intrinsic.Control.If(V.Local.sOppNumber,=,V.ODBC.con!rstNum.FieldValTrim!AUTO_NUMBER)
+			'Entering in a blank value so that the identity is updated.
+			F.ODBC.Connection!con.Execute("INSERT INTO GCG_3620_AUTO_NUM_OP VALUES ('')")
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+	F.ODBC.con!rstNum.Close
+F.Intrinsic.Control.EndIf
+
+F.ODBC.con!rst.Close
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("UpdateAutoNum_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3620_Auto_Num_Opp.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(Unload)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.UpdateAutoNum.End
+
+Program.Sub.Ship_To.Start
+F.Intrinsic.Control.SetErrorHandler("Ship_To_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+v.Passed.CRM-cboAddType.Set("Ship To")
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Ship_To_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3620_Auto_Num_Opp.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(Unload)
+Function.Intrinsic.Control.EndIf
+Program.Sub.Ship_To.End
+
+Program.Sub.Comments.Start
+${$0$}$Automatic Number Opportunities$}$BCC$}$2/16/2016
+${$1$}$$}$$}$1$}$42911$}$CRM.NET-OPP-SAVE$}$3/3/2016 11:40:48 AM$}$(Program: Global_Shop_CRM.exe; Screen: )
+
+${$1$}$$}$$}$0$}$42974$}$CRM.NET-OPP-TYPE-CHG$}$3/3/2016 11:40:28 AM$}$(Program: Global_Shop_CRM.exe; Screen: )
+
+${$3$}$0$}$$}$0$}$-1$}$$}$12:00:00 AM$}$This custom project will allow the user to use the opportunity tab for Service Requests, Parts Requests, Repair Requests, and Service Outreach. These opportunity types will be automatically numbered when selecting them. The project will also allow the user to email users in order to notify them that the opportunity is created. This email will auto-populate with data pertinent to the opportunity being created. A layout of the Email will be attached to the call.
+
+This project will also contain a maintenance program that will allow the user to select Types that will be auto-incremented.
+Program.Sub.Comments.End
+
